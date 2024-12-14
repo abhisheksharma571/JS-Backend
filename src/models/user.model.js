@@ -40,7 +40,8 @@ const userSchema = new Schema(
         ],
         password: {
             type: String,
-            required: [true, 'Password is required']
+            required: [true, 'Password is required'],
+            select: false
         },
         refreshToken: {
             type: String
@@ -52,13 +53,49 @@ const userSchema = new Schema(
 )
 
 userSchema.pre("save", async function (next) {
-    if(!this.isModified("password")) return next();
-    this.password = await bcrypt.hash(this.password, 10)
-    next()
+    if (!this.isModified("password")) {
+        console.log("Password not modified, skipping hash")
+        return next()
+    }
+    
+    try {
+        console.log("Hashing new password")
+        const hashedPassword = await bcrypt.hash(String(this.password).trim(), 10)
+        console.log("Password hashed successfully")
+        this.password = hashedPassword
+        next()
+    } catch (error) {
+        console.error("Password hashing error:", error)
+        next(error)
+    }
 })
 
-userSchema.methods.isPasswordCorrect = async function(password){
-    return await bcrypt.compare(password, this.password)
+userSchema.methods.isPasswordCorrect = async function(password) {
+    try {
+        console.log("Password validation started")
+        
+        if (!password) {
+            console.log("Input password is missing")
+            return false
+        }
+
+        // Ensure we're working with strings
+        const inputPassword = String(password)
+        
+        // Simple comparison logging
+        console.log({
+            inputPasswordExists: !!inputPassword,
+            storedPasswordExists: !!this.password,
+            inputLength: inputPassword.length,
+            storedLength: this.password?.length
+        })
+
+        // Do the comparison
+        return await bcrypt.compare(inputPassword, this.password)
+    } catch (error) {
+        console.error("Password validation error:", error)
+        return false
+    }
 }
 
 userSchema.methods.generateAccessToken = function(){
